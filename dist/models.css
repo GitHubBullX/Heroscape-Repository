@@ -1,0 +1,1 @@
+.mini-model,.terrain-sprite{pointer-events:none}.mini-model{filter:drop-shadow(0 4px 2px #000b)}.terrain-sprite{filter:drop-shadow(0 4px 2px #0007)}.unit.attackable{filter:drop-shadow(0 0 8px var(--red))}@media(max-width:760px){#deselectBtn{font-size:0;width:42px;padding:0}#deselectBtn:after{content:'×';font-size:22px}}
