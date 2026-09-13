@@ -1,91 +1,49 @@
-# Heroscape: Tactical Fantasy Board Game
+# Project Valhalla
 
-A modern implementation of a tactical hex-based board game inspired by Heroscape. Build armies, customize terrain, and engage in epic squad-based battles.
+A browser-based tactical hex game inspired by Heroscape. Build a 500-point army, command heroes and squads, and fight computer-controlled enemies across three campaign missions and one skirmish map. The battlefield uses SVG and painted miniature images; this is a single-player prototype.
 
-## Features
+## Run locally
 
-- **Hex-based Grid Combat**: Strategic positioning on a modular hexagonal battlefield
-- **Dynamic Terrain**: Customizable 3D terrain with elevation, obstacles, and special tiles
-- **Squad-Based Gameplay**: Command diverse heroes with unique abilities and stats
-- **Turn-Based Strategy**: Action point economy with special abilities and power cards
-- **Multiplayer Support**: Up to 4 players in competitive or cooperative modes
-- **Collectible Heroes**: 50+ unique heroes with varied roles (warriors, mages, archers, healers)
-- **Campaign Mode**: Story-driven missions with progression and unlockables
+Install Node.js 22 or newer, then run:
 
-## Quick Start
-
-```bash
-# Clone the repository
+```sh
 git clone https://github.com/GitHubBullX/Heroscape-Repository.git
 cd Heroscape-Repository
-
-# Install dependencies
-npm install
-
-# Run the development server
-npm run dev
-
-# Build for production
-npm run build
+# Until the import PR is merged:
+git switch codex/connect-and-stabilize
+node scripts/serve.mjs
 ```
 
-## Project Structure
+Open http://127.0.0.1:4173. No dependency installation is needed. `npm run dev` is equivalent if npm is installed. Set `PORT` to choose a different local port.
 
-```
-Heroscape-Repository/
-├── docs/                      # Game design documentation
-│   ├── GAME_DESIGN.md        # Core game mechanics
-│   ├── RULES.md              # Complete rulebook
-│   ├── HEROES.md             # Hero roster and abilities
-│   └── TERRAIN.md            # Terrain types and modifiers
-├── src/
-│   ├── core/                 # Game engine
-│   │   ├── game.ts           # Main game controller
-│   │   ├── board.ts          # Hex grid system
-│   │   ├── unit.ts           # Character/unit system
-│   │   └── combat.ts         # Combat resolution
-│   ├── ui/                   # User interface
-│   │   ├── board-view.ts     # Board rendering
-│   │   ├── ui-controller.ts  # UI state management
-│   │   └── hud.ts            # Heads-up display
-│   ├── data/                 # Game data
-│   │   ├── heroes.json       # Hero definitions
-│   │   ├── abilities.json    # Special abilities
-│   │   └── terrain.json      # Terrain types
-│   └── utils/                # Utility functions
-├── tests/                    # Unit tests
-├── package.json
-└── tsconfig.json
+## Validate
+
+```sh
+node scripts/check.mjs
+node --test
 ```
 
-## Game Overview
+With npm, use `npm run check`, `npm test`, and `npm run build`. The game is authored directly in `dist/`; build validates the static release files instead of generating a second copy. GitHub Actions runs validation and regression tests on pushes and pull requests. It does not deploy the game.
 
-### Core Mechanics
+## Source layout
 
-- **Hex Grid**: 20-40 hex battlefield with elevation system (0-3 levels)
-- **Action Points (AP)**: Each hero has 3-5 AP per turn for movement and actions
-- **Health & Armor**: Units have HP pools and damage mitigation
-- **Special Abilities**: Each hero has 2-4 unique powers
-- **Team Composition**: Build squads of 3-8 heroes within a point budget
+- `dist/game.js`: game rules, AI, UI, SVG rendering, and audio.
+- `dist/index.html` and CSS files: interface and styling.
+- `dist/models/`, `dist/terrain/`, `dist/structures/`: game artwork.
+- `tests/`: regression tests against the actual game code with a controlled clock and DOM stub.
+- `scripts/`: local server and release-file checks.
+- `.openai/hosting.json`: existing ChatGPT Site association.
+- `ITERATION_WORKFLOW.md`: gameplay and visual release checklist.
 
-### Victory Conditions
+## Recovered history and integration
 
-1. **Elimination**: Reduce enemy heroes to 0 HP
-2. **Objective Control**: Hold strategic positions
-3. **Scenario-Based**: Campaign-specific win conditions
+The source was recovered from `Project-Valhalla-Complete/PROJECT_HISTORY.bundle` on September 13, 2026. The pre-existing GitHub README commit is retained as an ancestor of the integration branch.
 
-## Development Roadmap
+- `archive/main-v9`: original bundle `main`, `8d5a3ce`.
+- `visual-rework-v10`: original candidate branch, `118bb2c`.
+- `live-v9`: original tag, preserved exactly.
+- `codex/connect-and-stabilize`: recovered source, GitHub history, development commands, CI, and stability fixes.
 
-- [ ] Phase 1: Core game engine (hex grid, movement, basic combat)
-- [ ] Phase 2: Hero roster & abilities system
-- [ ] Phase 3: UI & board visualization
-- [ ] Phase 4: Multiplayer networking
-- [ ] Phase 5: Campaign & progression system
+The integration fixes interrupted objective capture, AI work continuing after mission replacement, duplicate turn starts, stale animation callbacks, zoom-out camera bounds, inspection clearing, and pointer capture swallowing unit clicks. Phone controls now remain visible in two rows and terrain is easier to distinguish. See `VALIDATION.md` for automated and browser checks; full release acceptance remains separate.
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
-
-## License
-
-MIT License - See LICENSE file for details.
+The existing hosted game is at https://project-valhalla-tactics.mmcwhirter25.chatgpt.site. Pushing to GitHub does not update that Site. Preserve the Site association and follow `ITERATION_WORKFLOW.md` before a separate release.
