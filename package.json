@@ -1,6 +1,6 @@
 {
   "name": "project-valhalla",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "description": "Project Valhalla tactical hex battlefield",
   "engines": { "node": ">=22" },
@@ -9,6 +9,8 @@
     "start": "node scripts/serve.mjs",
     "test": "node --test",
     "check": "node --check dist/game.js && node scripts/check.mjs",
-    "build": "node scripts/check.mjs"
+    "build": "node scripts/check.mjs",
+    "voices:generate": "node scripts/generate-voices.mjs"
   }
 }
+

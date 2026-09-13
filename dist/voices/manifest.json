@@ -1,0 +1,9 @@
+{
+  "provider": "ElevenLabs",
+  "voice": "Adam - American, Dark and Tough",
+  "lines": {
+    "Narrator": {
+      "online": "voices/adam-battle-briefing.mp3"
+    }
+  }
+}
