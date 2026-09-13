@@ -1,25 +1,36 @@
-# Integration validation — September 13, 2026
+# Project Valhalla v11 validation
 
-## Automated
+## Automated checks
 
-- `node scripts/check.mjs`: JavaScript parses, referenced controls exist, 44 required static assets exist.
-- `node --test`: 10 regression tests pass (capture continuity, restart cancellation for both AI teams, duplicate turn input, stale queued turns and effects, camera bounds, inspection clearing, movement retention).
-- `git diff --check`: passes.
+- JavaScript parses successfully.
+- Every referenced interface control exists.
+- Required model, terrain, structure, voice-manifest, and audio assets exist.
+- The browser bundle contains no ElevenLabs or other API credential.
+- Fifteen gameplay regression tests pass.
+- The dependency-free production server returns the game, JavaScript, voice manifest, and MP3 with correct content types.
+- `git diff --check` passes.
 
-## Browser smoke checks
+## Regression coverage
 
-Tested the local static server in the Codex browser at desktop size and 390 × 844:
+- Movement remains spent after deselection and reselection.
+- A formation can attack before moving.
+- Enemy inspection does not spend or replace the selected formation.
+- Capture requires two consecutive uncontested rounds and resets when vacant or contested.
+- Tower and extreme elevation grant at most one additional range.
+- Authored elevation never exceeds two levels.
+- Duplicate turn input and stale AI/animation callbacks cannot mutate a replacement battle.
+- Zooming out returns the camera to the battlefield.
 
-- Main menu, campaign builder, 500-point default army, and deployment load.
-- Clicking a player formation selects it and reveals legal movement tiles. Fixed immediate SVG pointer capture that previously swallowed unit clicks.
-- A legal move updates the battle record and changes the hint to remaining attacks.
-- End turn runs allied and enemy actions and returns to the player in Round 2.
-- All footer commands, including End turn, are visible in two rows at phone width.
-- Terrain colors and tile edges are clear after removing the multicolored noise filter.
-- No browser console errors observed in the tested session.
+## Visual changes inspected
 
-These are smoke checks, not a complete release acceptance. Physical touch, audio, all campaign victories, and the full checklist in ITERATION_WORKFLOW.md remain unverified. No ChatGPT Site release was performed.
+- Masked checker-grid contamination on the twelve original miniature assets at render time without overwriting the source artwork.
+- Replaced scattered pseudo-random elevation with connected authored plateaus.
+- Rendered every wall segment on its own tile.
+- Added back-to-front sorting for props, structures, and units.
+- Reduced squad overlap and added compact squad-count badges.
+- Tightened tile seams, softened the moving light overlay, and simplified terrain contrast.
+- Kept all phone commands in a stable two-row deck.
 
-## History preservation
+## Remaining physical acceptance
 
-The integration includes the recovered game history and the existing GitHub README commit `7aefcc2` as ancestors. `archive/main-v9`, `visual-rework-v10`, and `live-v9` retain the original bundle references. The existing GitHub `main` is preserved; integration is submitted through a pull request.
+A real-phone pass should still confirm touch feel, the 30.7-second supplied Adam briefing, and complete campaign balance before this branch replaces the live v9 Site. No Site publishing is performed by repository validation.
