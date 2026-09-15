@@ -4,7 +4,7 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 
 function game() {
-  const elements = new Map(), timers = [];
+  const elements = new Map(), timers = [], audio = [], spoken = [];
   const element = () => ({
     dataset: {}, style: {}, children: [], className: '', textContent: '', innerHTML: '', disabled: false, clientWidth: 800,
     classList: { add() {}, remove() {} }, setAttribute() {}, addEventListener() {}, setPointerCapture() {}, releasePointerCapture() {},
@@ -19,8 +19,15 @@ function game() {
     createElement: element,
     createElementNS: element
   };
+  const speechSynthesis = { cancelCount: 0, cancel() { this.cancelCount++; }, speak(line) { spoken.push(line.text); } };
+  class AudioMock {
+    constructor(src) { this.src = src; this.paused = false; this.currentTime = 0; audio.push(this); }
+    play() { return Promise.resolve(); }
+    pause() { this.paused = true; }
+  }
+  class UtteranceMock { constructor(text) { this.text = text; } }
   const context = vm.createContext({
-    document, window: {}, console, Math,
+    document, window: { speechSynthesis }, Audio: AudioMock, SpeechSynthesisUtterance: UtteranceMock, console, Math,
     setTimeout(fn, delay) { timers.push({ fn, delay }); },
     setInterval() {}, clearInterval() {}, confirm: () => true
   });
@@ -33,11 +40,12 @@ function game() {
       camera(z,x,y){zoom=z;panX=x;panY=y;setView()},
       inspect(id){state.inspected=id},
       setHeight(q,r,value){hm[key(q,r)]=value},
-      heights(){return Object.values(hm)}
+      heights(){return Object.values(hm)}, playVoice,
+      setVoiceManifest(value){voiceManifest=value}, setSound(value){soundOn=value}
     };
   })();`), context);
   return {
-    api: context.game,
+    api: context.game, audio, spoken, speechSynthesis,
     elements,
     timers,
     async tick(delay) {
@@ -200,4 +208,30 @@ test('authored maps never create extreme floating elevation', () => {
 test('browser bundle contains no ElevenLabs credential', () => {
   const source = readFileSync(require.resolve('../dist/game.js'), 'utf8');
   assert.doesNotMatch(source, /xi-api-key|ELEVENLABS_API_KEY|sk_[a-z0-9]{16,}/i);
+});
+
+test('character voice cues use their own action-specific clips without overlap', async () => {
+  const { api, audio, speechSynthesis } = game();
+  api.setSound(true);
+  api.setVoiceManifest({ lines: {
+    'Skywatch Rangers': { ready: 'voices/rangers-ready.mp3', attack: 'voices/rangers-attack.mp3' }
+  } });
+  api.playVoice('Skywatch Rangers', 'ready', 'Rangers ready.');
+  api.playVoice('Skywatch Rangers', 'attack', 'Rangers attack.');
+  assert.deepEqual(audio.map(line => line.src), ['voices/rangers-ready.mp3', 'voices/rangers-attack.mp3']);
+  assert.equal(audio[0].paused, true);
+  assert.equal(audio[0].currentTime, 0);
+  assert.equal(audio[1].paused, false);
+  assert.equal(speechSynthesis.cancelCount, 2);
+});
+
+test('speech fallback and recorded clips share one exclusive voice channel', () => {
+  const { api, audio, spoken, speechSynthesis } = game();
+  api.setSound(true);
+  api.setVoiceManifest({ lines: { Narrator: { online: 'voices/briefing.mp3' } } });
+  api.playVoice('Iron Guard', 'ready', 'The shield wall stands.');
+  assert.deepEqual(spoken, ['The shield wall stands.']);
+  api.playVoice('Narrator', 'online', 'Command online.');
+  assert.equal(audio.length, 1);
+  assert.equal(speechSynthesis.cancelCount, 2);
 });
