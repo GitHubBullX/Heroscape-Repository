@@ -4,7 +4,7 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 
 function game() {
-  const elements = new Map(), timers = [];
+  const elements = new Map(), timers = [], audio = [], spoken = [];
   const element = () => ({
     dataset: {}, style: {}, children: [], className: '', textContent: '', innerHTML: '', disabled: false, clientWidth: 800,
     classList: { add() {}, remove() {} }, setAttribute() {}, addEventListener() {}, setPointerCapture() {}, releasePointerCapture() {},
@@ -19,8 +19,15 @@ function game() {
     createElement: element,
     createElementNS: element
   };
+  const speechSynthesis = { cancelCount: 0, cancel() { this.cancelCount++; }, speak(line) { spoken.push(line.text); } };
+  class AudioMock {
+    constructor(src) { this.src = src; this.paused = false; this.currentTime = 0; audio.push(this); }
+    play() { return Promise.resolve(); }
+    pause() { this.paused = true; }
+  }
+  class UtteranceMock { constructor(text) { this.text = text; } }
   const context = vm.createContext({
-    document, window: {}, console, Math,
+    document, window: { speechSynthesis }, Audio: AudioMock, SpeechSynthesisUtterance: UtteranceMock, console, Math,
     setTimeout(fn, delay) { timers.push({ fn, delay }); },
     setInterval() {}, clearInterval() {}, confirm: () => true
   });
@@ -29,15 +36,19 @@ function game() {
     globalThis.game = {
       get state(){return state}, get pan(){return [panX,panY]},
       reset(){state=fresh();return state}, endRound, allyTurn, enemyTurn,
-      finish, combat, animateMove, deselect, reach, range, clickUnit, hex,
+      finish, combat, animateMove, deselect, reach, range, clickUnit, hex, spawnWave, target,
       camera(z,x,y){zoom=z;panX=x;panY=y;setView()},
       inspect(id){state.inspected=id},
       setHeight(q,r,value){hm[key(q,r)]=value},
-      heights(){return Object.values(hm)}
+      heights(){return Object.values(hm)}, playVoice,
+      setVoiceManifest(value){voiceManifest=value}, setSound(value){soundOn=value},
+      setMission(value){mission=value;state=fresh();return state},
+      setDifficulty(value){difficulty=value;state=fresh();return state},
+      setSeed(value){state.seed=value>>>0}
     };
   })();`), context);
   return {
-    api: context.game,
+    api: context.game, audio, spoken, speechSynthesis,
     elements,
     timers,
     async tick(delay) {
@@ -200,4 +211,92 @@ test('authored maps never create extreme floating elevation', () => {
 test('browser bundle contains no ElevenLabs credential', () => {
   const source = readFileSync(require.resolve('../dist/game.js'), 'utf8');
   assert.doesNotMatch(source, /xi-api-key|ELEVENLABS_API_KEY|sk_[a-z0-9]{16,}/i);
+});
+
+test('bases exist only in authored base missions', () => {
+  const { api } = game();
+  assert.equal(api.setMission(0).bases.length, 0);
+  const assault = api.setMission(1);
+  assert.equal(assault.mode, 'assault');
+  assert.equal(assault.bases.map(base => base.team).join(','), 'enemy');
+  const stronghold = api.setMission(2);
+  assert.equal(stronghold.mode, 'stronghold');
+  assert.equal(stronghold.bases.map(base => base.team).sort().join(','), 'enemy,player');
+  assert.equal(api.setMission(3).bases.length, 0);
+  const defense = api.setMission(4);
+  assert.equal(defense.mode, 'defense');
+  assert.equal(defense.bases.map(base => base.team).join(','), 'player');
+});
+
+test('defense waves arrive on authored rounds and survival ends after round six', () => {
+  const { api } = game();
+  const state = api.setMission(4);
+  const initial = state.units.filter(unit => unit.team === 'enemy').length;
+  api.endRound();
+  assert.equal(state.round, 2);
+  assert.equal(state.units.filter(unit => unit.team === 'enemy').length, initial + 2);
+  while (state.round < 6) api.endRound();
+  assert.equal(state.over, false);
+  api.endRound();
+  assert.equal(state.over, true);
+  assert.equal(state.victory, true);
+});
+
+test('heroic difficulty scales enemy durability and attack', () => {
+  const { api } = game();
+  const normal = api.setMission(1).units.find(unit => unit.team === 'enemy');
+  const heroic = api.setDifficulty('heroic').units.find(unit => unit.team === 'enemy');
+  assert.ok(heroic.maxHp > normal.maxHp);
+  assert.ok(heroic.attack >= normal.attack);
+});
+
+test('combat is reproducible from the same battle seed', () => {
+  const { api } = game();
+  const first = api.state.units.find(unit => unit.team === 'player');
+  const firstEnemy = api.state.units.find(unit => unit.team === 'enemy');
+  api.setSeed(42);
+  api.combat(first, firstEnemy);
+  const damage = firstEnemy.maxHp - firstEnemy.hp;
+  const reset = api.reset();
+  const attacker = reset.units.find(unit => unit.team === 'player');
+  const defender = reset.units.find(unit => unit.team === 'enemy');
+  api.setSeed(42);
+  api.combat(attacker, defender);
+  assert.equal(defender.maxHp - defender.hp, damage);
+});
+
+test('destroying an enemy base wins a base mission', () => {
+  const { api } = game();
+  const state = api.setMission(1);
+  const attacker = state.units.find(unit => unit.team === 'player');
+  const base = state.bases.find(item => item.team === 'enemy');
+  attacker.q = base.q; attacker.r = base.r + 1; attacker.attack = 20;
+  api.combat(attacker, base);
+  assert.equal(base.hp, 0);
+  assert.equal(state.over, true);
+  assert.equal(state.victory, true);
+});
+
+test('character voice cues use one exclusive playback channel', () => {
+  const { api, audio, speechSynthesis } = game();
+  api.setSound(true);
+  api.setVoiceManifest({ lines: { 'Skywatch Rangers': { ready: 'voices/ready.mp3', attack: 'voices/attack.mp3' } } });
+  api.playVoice('Skywatch Rangers', 'ready', 'Ready.');
+  api.playVoice('Skywatch Rangers', 'attack', 'Attack.');
+  assert.deepEqual(audio.map(line => line.src), ['voices/ready.mp3', 'voices/attack.mp3']);
+  assert.equal(audio[0].paused, true);
+  assert.equal(audio[0].currentTime, 0);
+  assert.equal(audio[1].paused, false);
+  assert.equal(speechSynthesis.cancelCount, 2);
+});
+
+test('recorded audio cancels synthesized fallback chatter', () => {
+  const { api, audio, spoken, speechSynthesis } = game();
+  api.setSound(true);
+  api.setVoiceManifest({ lines: { Narrator: { online: 'voices/briefing.mp3' } } });
+  api.playVoice('Iron Guard', 'ready', 'Shield wall ready.');
+  assert.deepEqual(spoken, ['Shield wall ready.']);
+  api.playVoice('Narrator', 'online', 'Command online.');
+  assert.equal(audio.length, 1);
+  assert.equal(speechSynthesis.cancelCount, 2);
 });
