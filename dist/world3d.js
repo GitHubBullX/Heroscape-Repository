@@ -15,7 +15,8 @@ function shader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);g
 const prog=gl.createProgram();gl.attachShader(prog,shader(gl.VERTEX_SHADER,vs));gl.attachShader(prog,shader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog));gl.useProgram(prog);
 const vao=gl.createVertexArray(),buf=gl.createBuffer();gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,buf);for(let i=0;i<3;i++){gl.enableVertexAttribArray(i);gl.vertexAttribPointer(i,3,gl.FLOAT,false,36,i*12)}
 const Uview=gl.getUniformLocation(prog,'view'),Utime=gl.getUniformLocation(prog,'time');
-let vertices=[],count=0,last=null,lastGeometrySignature='',start=performance.now(),quality=devicePixelRatio>1.6&&innerWidth<800?.72:1;
+let vertices=[],count=0,last=null,lastGeometrySignature='',contextLost=false,start=performance.now(),quality=devicePixelRatio>1.6&&innerWidth<800?.72:1;
+canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;canvas.hidden=true;document.body.classList.remove('webgl-ready')});
 const colors={ground:[.24,.55,.18],forest:[.10,.32,.16],water:[.04,.48,1.8],marsh:[.19,.34,.21],ridge:[.38,.39,.38],road:[.48,.35,.21],snow:[.78,.91,.95],lava:[1.15,.18,.035],objective:[.72,.58,.12]};
 function tri(a,b,c,n,col){for(const p of[a,b,c])vertices.push(...p,...n,...col)}
 function quad(a,b,c,d,n,col){tri(a,b,c,n,col);tri(a,c,d,n,col)}
@@ -36,6 +37,6 @@ for(const b of data.state.bases||[]){if(b.hp<=0)continue;const p=center(b.q,b.r,
 for(const u of data.state.units||[]){if(u.hp<=0)continue;const p=center(u.q,u.r,data.height[u.q+','+u.r]||0),n=Math.min(u.size,Math.max(1,Math.ceil(u.size*u.hp/u.maxHp)));for(let i=0;i<n;i++)miniature(u,p,i,n)}
 gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.DYNAMIC_DRAW);count=vertices.length/9;document.body.classList.add('webgl-ready')}
 function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1)*quality,w=Math.max(1,Math.round(r.width*d)),h=Math.max(1,Math.round(r.height*d));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h)}}
-function frame(){resize();gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.clearColor(.20,.44,.58,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);if(last){gl.useProgram(prog);gl.uniform4f(Uview,last.view.x,last.view.y,last.view.w,last.view.h);gl.uniform1f(Utime,(performance.now()-start)/1000);gl.bindVertexArray(vao);gl.drawArrays(gl.TRIANGLES,0,count)}requestAnimationFrame(frame)}
-window.Valhalla3D={render(data){last=data;const signature=geometrySignature(data);if(signature!==lastGeometrySignature){lastGeometrySignature=signature;rebuild(data)}},setView(view){if(last)last.view=view},available:true};requestAnimationFrame(frame);
+function frame(){if(!contextLost){resize();gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.clearColor(.20,.44,.58,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);if(last){gl.useProgram(prog);gl.uniform4f(Uview,last.view.x,last.view.y,last.view.w,last.view.h);gl.uniform1f(Utime,(performance.now()-start)/1000);gl.bindVertexArray(vao);gl.drawArrays(gl.TRIANGLES,0,count)}}requestAnimationFrame(frame)}
+window.Valhalla3D={render(data){if(contextLost)return;last=data;const signature=geometrySignature(data);if(signature!==lastGeometrySignature){lastGeometrySignature=signature;rebuild(data)}},setView(view){if(last)last.view=view},get available(){return!contextLost}};requestAnimationFrame(frame);
 })();
