@@ -4,7 +4,7 @@ const { readFileSync } = require('node:fs');
 const vm = require('node:vm');
 
 test('WebGL battlefield builds and caches real triangle geometry from game state', () => {
-  let uploaded = 0, uploads = 0;
+  let uploaded = 0, uploads = 0, contextLostHandler;
   const gl = new Proxy({}, {
     get(target, key) {
       if (key === 'VERTEX_SHADER') return 1;
@@ -19,10 +19,12 @@ test('WebGL battlefield builds and caches real triangle geometry from game state
   const canvas = {
     getContext(name) { assert.equal(name, 'webgl2'); return gl; },
     getBoundingClientRect() { return { width: 800, height: 600 }; },
+    addEventListener(name, handler) { if (name === 'webglcontextlost') contextLostHandler = handler; },
     width: 0, height: 0
   };
+  const classes = new Set();
   const context = vm.createContext({
-    document: { querySelector: () => canvas, body: { classList: { add() {} } } },
+    document: { querySelector: () => canvas, body: { classList: { add(value) { classes.add(value); }, remove(value) { classes.delete(value); } } } },
     window: {}, performance: { now: () => 0 }, requestAnimationFrame() {},
     devicePixelRatio: 1, innerWidth: 800, Math, Float32Array
   });
@@ -46,4 +48,12 @@ test('WebGL battlefield builds and caches real triangle geometry from game state
   scene.state.units[0].q = 2;
   context.window.Valhalla3D.render(scene);
   assert.equal(uploads, 2, 'game-state geometry changes should rebuild the mesh');
+  let prevented = false;
+  contextLostHandler({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(canvas.hidden, true);
+  assert.equal(context.window.Valhalla3D.available, false);
+  assert.equal(classes.has('webgl-ready'), false);
+  context.window.Valhalla3D.render(scene);
+  assert.equal(uploads, 2, 'lost contexts should stop GPU uploads and retain the SVG fallback');
 });
